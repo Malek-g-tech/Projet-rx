@@ -27,7 +27,7 @@ int main(){
     addr.sin_family = AF_INET;
 
     inet_pton(AF_INET,"127.0.0.1",&addr.sin_addr);
-    addr.sin_port = htons(80);
+    addr.sin_port = htons(8080);
 
     ssize_t size = sizeof(addr);
     bind(sock,(struct sockaddr*)&addr,size);
@@ -40,5 +40,5 @@ int main(){
 
     int rec_sock = accept(sock,(struct sockaddr*)&recived,&s);
     rec_size = read(rec_sock,buffer,4095);
-
+    printf("%s\n",buffer);
 }
