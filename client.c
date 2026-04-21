@@ -11,49 +11,42 @@
 #define BUFFER_SIZE 1024
 
 int main() {
-    int sockfd;
+    int sock;
     struct sockaddr_in server_addr;
-    socklen_t server_len = sizeof(server_addr);
     char buffer[BUFFER_SIZE];
     ssize_t n;
     time_t now;
     struct tm *tm_info;
 
-    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sockfd < 0) {
+    sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock < 0) {
         perror("socket");
         exit(EXIT_FAILURE);
     }
 
     memset(&server_addr, 0, sizeof(server_addr));
-
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(PORT);
 
     if (inet_pton(AF_INET, SERVER_IP, &server_addr.sin_addr) <= 0) {
         perror("inet_pton");
-        close(sockfd);
+        close(sock);
         exit(EXIT_FAILURE);
     }
 
-    // Initial message so server learns client address
-    const char *start = "START\n";
-    if (sendto(sockfd, start, strlen(start), 0,
-               (struct sockaddr *)&server_addr, server_len) < 0) {
-        perror("sendto START");
-        close(sockfd);
+    if (connect(sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+        perror("connect");
+        close(sock);
         exit(EXIT_FAILURE);
     }
 
-    // Receive "Bonjour"
-    n = recvfrom(sockfd, buffer, BUFFER_SIZE - 1, 0,
-                 (struct sockaddr *)&server_addr, &server_len);
+    // Receive "Bonjour" from station 1
+    n = recv(sock, buffer, BUFFER_SIZE - 1, 0);
     if (n < 0) {
-        perror("recvfrom Bonjour");
-        close(sockfd);
+        perror("recv Bonjour");
+        close(sock);
         exit(EXIT_FAILURE);
     }
-
     buffer[n] = '\0';
     printf("%s", buffer);
 
@@ -68,28 +61,25 @@ int main() {
                  tm_info->tm_min,
                  tm_info->tm_sec);
 
-        if (sendto(sockfd, buffer, strlen(buffer), 0,
-                   (struct sockaddr *)&server_addr, server_len) < 0) {
-            perror("sendto time");
-            close(sockfd);
+        if (send(sock, buffer, strlen(buffer), 0) < 0) {
+            perror("send time");
+            close(sock);
             exit(EXIT_FAILURE);
         }
 
         sleep(1);
     }
 
-    // Receive "Au revoir"
-    n = recvfrom(sockfd, buffer, BUFFER_SIZE - 1, 0,
-                 (struct sockaddr *)&server_addr, &server_len);
+    // Receive "Au revoir" from station 1
+    n = recv(sock, buffer, BUFFER_SIZE - 1, 0);
     if (n < 0) {
-        perror("recvfrom Au revoir");
-        close(sockfd);
+        perror("recv Au revoir");
+        close(sock);
         exit(EXIT_FAILURE);
     }
-
     buffer[n] = '\0';
     printf("%s", buffer);
 
-    close(sockfd);
+    close(sock);
     return 0;
 }
