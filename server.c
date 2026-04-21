@@ -7,14 +7,16 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 
-#define PORT 8080
-#define BUFFER_SIZE 4096
+#define PORT 9090
+#define BUFFER_SIZE 1024
 
 int main() {
     int server_fd, client_fd;
     struct sockaddr_in server_addr, client_addr;
     socklen_t client_len = sizeof(client_addr);
     char buffer[BUFFER_SIZE];
+    ssize_t n;
+    int msg_count = 0;
 
     server_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (server_fd < 0) {
@@ -46,7 +48,7 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    printf("HTTP server listening on port %d...\n", PORT);
+    printf("Server listening on port %d...\n", PORT);
 
     client_fd = accept(server_fd, (struct sockaddr *)&client_addr, &client_len);
     if (client_fd < 0) {
@@ -55,7 +57,31 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    ssize_t n = recv(client_fd, buffer, BUFFER_SIZE - 1, 0);
+    printf("Client connected: %s:%d\n",
+           inet_ntoa(client_addr.sin_addr),
+           ntohs(client_addr.sin_port));
+
+    // Send "Bonjour" immediately after connection
+    const char *hello = "Bonjour\n";
+    if (send(client_fd, hello, strlen(hello), 0) < 0) {
+        perror("send Bonjour");
+        close(client_fd);
+        close(server_fd);
+        exit(EXIT_FAILURE);
+    }
+
+    // Receive 60 time messages from station 2
+    while (msg_count < 60 && (n = recv(client_fd, buffer, BUFFER_SIZE - 1, 0)) > 0) {
+        buffer[n] = '\0';
+        printf("%s", buffer);
+
+        for (ssize_t i = 0; i < n; i++) {
+            if (buffer[i] == '\n') {
+                msg_count++;
+            }
+        }
+    }
+
     if (n < 0) {
         perror("recv");
         close(client_fd);
@@ -63,30 +89,18 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    buffer[n] = '\0';
+    // Send "Au revoir" after receiving the 60 messages
+    const char *bye = "Au revoir\n";
+    if (send(client_fd, bye, strlen(bye), 0) < 0) {
+        perror("send Au revoir");
+        close(client_fd);
+        close(server_fd);
+        exit(EXIT_FAILURE);
+    }
 
-    printf("Received request:\n%s\n", buffer);
-
-    const char *body = "Hello from C HTTP server\n";
-    char response[BUFFER_SIZE];
-
-    int body_len = strlen(body);
-
-    int response_len = snprintf(
-        response, sizeof(response),
-        "HTTP/1.1 200 OK\r\n"
-        "Content-Type: text/plain\r\n"
-        "Content-Length: %d\r\n"
-        "Connection: close\r\n"
-        "\r\n"
-        "%s",
-        body_len, body
-    );
-
-    send(client_fd, response, response_len, 0);
+    printf("\nTotal time messages received: %d\n", msg_count);
 
     close(client_fd);
     close(server_fd);
-
     return 0;
 }
